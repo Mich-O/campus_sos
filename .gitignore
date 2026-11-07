@@ -65,3 +65,6 @@ app.*.map.json
 # Platform service configuration files may contain project identifiers or keys
 **/google-services.json
 **/GoogleService-Info.plist
+
+# Local Gradle cache and temp files redirected to F: for this project
+.campus_sos_build/
