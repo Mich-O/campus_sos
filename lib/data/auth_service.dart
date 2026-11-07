@@ -1,6 +1,27 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+class PasswordPolicy {
+  PasswordPolicy._();
+
+  static const minimumLength = 12;
+  static const guidance =
+      '12+ characters, with uppercase, lowercase, a number, and a symbol.';
+  static const _acceptedSymbols = r'''^$*.[\]{}()?"!@#%&/\,><':;|_~''';
+
+  static String? validate(String? password) {
+    if (password == null || password.isEmpty) return 'Enter a password.';
+    if (password.length < minimumLength) return 'Use at least 12 characters.';
+    if (!RegExp(r'[a-z]').hasMatch(password)) return 'Add a lowercase letter.';
+    if (!RegExp(r'[A-Z]').hasMatch(password)) return 'Add an uppercase letter.';
+    if (!RegExp(r'[0-9]').hasMatch(password)) return 'Add a number.';
+    if (!password.split('').any((character) => _acceptedSymbols.contains(character))) {
+      return 'Add a symbol such as !, @, #, or _.';
+    }
+    return null;
+  }
+}
+
 class AuthService {
   AuthService({FirebaseAuth? auth, FirebaseFirestore? firestore})
       : _auth = auth ?? FirebaseAuth.instance,
