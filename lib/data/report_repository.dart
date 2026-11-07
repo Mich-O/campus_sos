@@ -1,3 +1,8 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:path_provider/path_provider.dart';
+
 import '../models/incident_report.dart';
 
 class ReportRepository {
@@ -34,11 +39,63 @@ class ReportRepository {
     ),
   ];
 
+  Directory? _appDirectory;
   List<IncidentReport> get reports => List.unmodifiable(_reports);
 
-  void add(IncidentReport report) => _reports.insert(0, report);
+  Future<List<IncidentReport>> load() async {
+    final file = await _reportsFile();
+    if (!await file.exists()) {
+      await _save();
+      return reports;
+    }
+    final decoded = jsonDecode(await file.readAsString()) as List<dynamic>;
+    _reports
+      ..clear()
+      ..addAll(
+        decoded.map(
+          (entry) =>
+              IncidentReport.fromJson(Map<String, dynamic>.from(entry as Map)),
+        ),
+      );
+    return reports;
+  }
 
-  void updateStatus(String id, IncidentStatus status) {
+  Future<void> add(IncidentReport report) async {
+    var savedReport = report;
+    final sourcePath = report.photoPath;
+    if (sourcePath != null) {
+      final source = File(sourcePath);
+      if (!await source.exists()) {
+        throw FileSystemException(
+          'The selected photo could not be found.',
+          sourcePath,
+        );
+      }
+      final appDirectory = await _directory();
+      final photosDirectory = Directory('${appDirectory.path}/report_photos');
+      await photosDirectory.create(recursive: true);
+      final extension = sourcePath.contains('.')
+          ? '.${sourcePath.split('.').last}'
+          : '.jpg';
+      final destination = '${photosDirectory.path}/${report.id}$extension';
+      final copiedPhoto = await source.copy(destination);
+      savedReport = IncidentReport(
+        id: report.id,
+        title: report.title,
+        description: report.description,
+        category: report.category,
+        location: report.location,
+        status: report.status,
+        reporterName: report.reporterName,
+        createdAt: report.createdAt,
+        photoPath: copiedPhoto.path,
+      );
+    }
+    _reports.insert(0, savedReport);
+    await _save();
+  }
+
+  Future<void> updateStatus(String id, IncidentStatus status) async {
     final index = _reports.indexWhere((report) => report.id == id);
     if (index < 0) return;
     final old = _reports[index];
@@ -53,6 +110,21 @@ class ReportRepository {
       createdAt: old.createdAt,
       photoPath: old.photoPath,
     );
+    await _save();
+  }
+
+  Future<Directory> _directory() async =>
+      _appDirectory ??= await getApplicationDocumentsDirectory();
+
+  Future<File> _reportsFile() async {
+    final directory = await _directory();
+    return File('${directory.path}/campus_sos_reports.json');
+  }
+
+  Future<void> _save() async {
+    final file = await _reportsFile();
+    await file.writeAsString(
+      jsonEncode(_reports.map((report) => report.toJson()).toList()),
+    );
   }
 }
-

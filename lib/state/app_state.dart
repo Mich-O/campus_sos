@@ -5,37 +5,56 @@ import '../models/incident_report.dart';
 
 class AppState extends ChangeNotifier {
   AppState({ReportRepository? repository})
-    : _repository = repository ?? ReportRepository();
+    : _repository = repository ?? ReportRepository() {
+    _reports = _repository.reports;
+    _ready = _restoreReports();
+  }
 
   final ReportRepository _repository;
-  List<IncidentReport> get reports => _repository.reports;
+  late List<IncidentReport> _reports;
+  late final Future<void> _ready;
+  String? _storageError;
 
-  void createReport({
+  List<IncidentReport> get reports => List.unmodifiable(_reports);
+  String? get storageError => _storageError;
+
+  Future<void> _restoreReports() async {
+    try {
+      _reports = await _repository.load();
+    } catch (error) {
+      _storageError = error.toString();
+    }
+    notifyListeners();
+  }
+
+  Future<void> createReport({
     required String title,
     required String description,
     required String category,
     required String location,
     String? photoPath,
-  }) {
-    _repository.add(
-      IncidentReport(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
-        title: title.trim(),
-        description: description.trim(),
-        category: category,
-        location: location.trim(),
-        status: IncidentStatus.submitted,
-        reporterName: 'You',
-        createdAt: DateTime.now(),
-        photoPath: photoPath,
-      ),
+  }) async {
+    await _ready;
+    final report = IncidentReport(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      title: title.trim(),
+      description: description.trim(),
+      category: category,
+      location: location.trim(),
+      status: IncidentStatus.submitted,
+      reporterName: 'You',
+      createdAt: DateTime.now(),
+      photoPath: photoPath,
     );
+    await _repository.add(report);
+    _reports = _repository.reports;
     notifyListeners();
   }
 
-  void updateStatus(String reportId, IncidentStatus status) {
-    _repository.updateStatus(reportId, status);
+  Future<void> updateStatus(String reportId, IncidentStatus status) async {
+    await _ready;
+    await _repository.updateStatus(reportId, status);
+    _reports = _repository.reports;
     notifyListeners();
   }
 }
-

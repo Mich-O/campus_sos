@@ -36,6 +36,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   provider: ^6.1.2
   image_picker: ^1.1.2
+  path_provider: ^2.1.6
 
 dev_dependencies:
   flutter_test:
@@ -88,9 +89,3 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
-
-
-
-
-
-

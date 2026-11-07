@@ -186,19 +186,29 @@ class _NewReportScreenState extends State<NewReportScreen> {
     }
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    context.read<AppState>().createReport(
-      title: _title.text,
-      description: _description.text,
-      category: _category,
-      location: _location.text,
-      photoPath: _photo?.path,
-    );
-    Navigator.pop(context);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Report added to this local preview.')),
-    );
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await context.read<AppState>().createReport(
+        title: _title.text,
+        description: _description.text,
+        category: _category,
+        location: _location.text,
+        photoPath: _photo?.path,
+      );
+      if (!mounted) return;
+      Navigator.pop(context);
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Report saved on this phone.')),
+      );
+    } catch (error) {
+      if (mounted) {
+        messenger.showSnackBar(
+          SnackBar(content: Text('Could not save report: $error')),
+        );
+      }
+    }
   }
 }
 
@@ -211,4 +221,3 @@ class _Label extends StatelessWidget {
     child: Text(text, style: const TextStyle(fontWeight: FontWeight.w800)),
   );
 }
-

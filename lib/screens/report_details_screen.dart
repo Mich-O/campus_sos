@@ -225,4 +225,3 @@ class _StatusTimeline extends StatelessWidget {
     );
   }
 }
-
