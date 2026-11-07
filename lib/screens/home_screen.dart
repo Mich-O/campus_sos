@@ -166,30 +166,24 @@ class _ReportsTab extends ConsumerWidget {
 class _ProfileTab extends ConsumerWidget {
   const _ProfileTab();
   Future<void> _editProfile(BuildContext context, WidgetRef ref, AppUser profile) async {
-    final name = TextEditingController(text: profile.displayName);
-    final program = TextEditingController(text: profile.program);
-    final location = TextEditingController(text: profile.location);
+    final details = await showDialog<_ProfileDraft>(
+      context: context,
+      builder: (_) => _ProfileEditDialog(profile: profile),
+    );
+    if (details == null || !context.mounted) return;
     try {
-      final save = await showDialog<bool>(context: context, builder: (dialogContext) => AlertDialog(
-        title: const Text('Edit profile'),
-        content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
-          TextField(controller: name, textCapitalization: TextCapitalization.words, decoration: const InputDecoration(labelText: 'Name')),
-          TextField(controller: program, decoration: const InputDecoration(labelText: 'Program')),
-          TextField(controller: location, decoration: const InputDecoration(labelText: 'Campus location')),
-        ])),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Save')),
-        ],
-      ));
-      if (save == true) {
-        await ref.read(authServiceProvider).updateProfile(name: name.text, program: program.text, location: location.text);
-        if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile updated.')));
+      await ref.read(authServiceProvider).updateProfile(
+        name: details.name,
+        program: details.program,
+        location: details.location,
+      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profile updated.')),
+        );
       }
     } catch (e) {
       if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not update profile: ' + e.toString())));
-    } finally {
-      name.dispose(); program.dispose(); location.dispose();
     }
   }
   Future<void> _changeProfilePhoto(BuildContext context, WidgetRef ref) async {
@@ -234,6 +228,97 @@ class _ProfileTab extends ConsumerWidget {
     ]));
   }
 }
+
+class _ProfileDraft {
+  const _ProfileDraft({
+    required this.name,
+    required this.program,
+    required this.location,
+  });
+
+  final String name;
+  final String program;
+  final String location;
+}
+
+class _ProfileEditDialog extends StatefulWidget {
+  const _ProfileEditDialog({required this.profile});
+  final AppUser profile;
+
+  @override
+  State<_ProfileEditDialog> createState() => _ProfileEditDialogState();
+}
+
+class _ProfileEditDialogState extends State<_ProfileEditDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _name;
+  late final TextEditingController _program;
+  late final TextEditingController _location;
+
+  @override
+  void initState() {
+    super.initState();
+    _name = TextEditingController(text: widget.profile.displayName);
+    _program = TextEditingController(text: widget.profile.program);
+    _location = TextEditingController(text: widget.profile.location);
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _program.dispose();
+    _location.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    if (!_formKey.currentState!.validate()) return;
+    Navigator.of(context).pop(_ProfileDraft(
+      name: _name.text.trim(),
+      program: _program.text.trim(),
+      location: _location.text.trim(),
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+        title: const Text('Edit profile'),
+        content: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: _name,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: const InputDecoration(labelText: 'Name'),
+                  validator: (value) => (value == null || value.trim().length < 2)
+                      ? 'Enter at least 2 characters.'
+                      : null,
+                ),
+                TextFormField(
+                  controller: _program,
+                  decoration: const InputDecoration(labelText: 'Program'),
+                ),
+                TextFormField(
+                  controller: _location,
+                  decoration: const InputDecoration(labelText: 'Campus location'),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(onPressed: _save, child: const Text('Save')),
+        ],
+      );
+}
+
 class StatusRoleBadge extends StatelessWidget {
   const StatusRoleBadge({required this.label, super.key});
   final String label;
