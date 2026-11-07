@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme/app_theme.dart';
+import '../data/auth_service.dart';
 import '../state/providers.dart';
 
 class AuthScreen extends ConsumerStatefulWidget {
@@ -30,23 +31,14 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     'invalid-email' => e.message ?? 'Use your ALU student email or the approved staff account.',
     'user-not-found' || 'wrong-password' || 'invalid-credential' => 'Email or password is incorrect.',
     'email-already-in-use' => 'An account already exists for this email.',
-    'weak-password' => 'Use 12 or more characters with uppercase, lowercase, a number, and a symbol.',
+    'weak-password' => PasswordPolicy.guidance,
     'network-request-failed' => 'Could not connect. Check your internet connection.',
     _ => e.message ?? 'Sign-in failed. Please try again.',
   };
   String? _validatePassword(String? value) {
-    if (value == null || value.isEmpty) return 'Enter a password.';
     // Existing accounts may keep signing in with their current password.
-    if (!_registering) return null;
-    if (value.length < 12) return 'Use at least 12 characters.';
-    if (!RegExp(r'[a-z]').hasMatch(value)) return 'Add a lowercase letter.';
-    if (!RegExp(r'[A-Z]').hasMatch(value)) return 'Add an uppercase letter.';
-    if (!RegExp(r'[0-9]').hasMatch(value)) return 'Add a number.';
-    const allowedSymbols = r'''^$*.[\]{}()?"!@#%&/\,><':;|_~''';
-    if (!value.split('').any((character) => allowedSymbols.contains(character))) {
-      return 'Add a symbol such as !, @, #, or _.';
-    }
-    return null;
+    if (_registering) return PasswordPolicy.validate(value);
+    return value == null || value.isEmpty ? 'Enter a password.' : null;
   }
   @override Widget build(BuildContext context) => Scaffold(
     backgroundColor: AppColors.ink,
@@ -86,7 +78,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                 validator: _validatePassword),
               if (_registering) ...[
                 const SizedBox(height: 6),
-                Text('12+ characters, with uppercase, lowercase, a number, and a symbol.', style: AppText.secondary),
+                Text(PasswordPolicy.guidance, style: AppText.secondary),
               ],
               if (_error != null) ...[const SizedBox(height: 12), Text(_error!, style: AppText.secondary.copyWith(color: AppColors.error))],
               const SizedBox(height: 20),
