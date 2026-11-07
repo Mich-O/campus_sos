@@ -1,0 +1,14 @@
+# Keep a small local lint set so the project does not need an extra lint package.
+analyzer:
+  exclude:
+    - build/**
+    - android/**
+    - ios/**
+    - web/**
+    - windows/**
+    - macos/**
+    - linux/**
+linter:
+  rules:
+    avoid_print: true
+    prefer_const_constructors: true

@@ -1,0 +1,11 @@
+/.gradle
+/captures/
+/local.properties
+GeneratedPluginRegistrant.java
+.cxx/
+
+# Keep Gradle wrapper scripts and JAR in version control.
+# Keep release signing credentials local.
+key.properties
+**/*.keystore
+**/*.jks
