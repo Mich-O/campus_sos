@@ -1,11 +1,19 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'data/report_repository.dart';
+import 'firebase_options.dart';
 import 'screens/home_screen.dart';
 import 'state/app_state.dart';
 
-void main() => runApp(const CampusSosApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  runApp(const CampusSosApp());
+}
 
 class CampusSosApp extends StatelessWidget {
   const CampusSosApp({super.key});

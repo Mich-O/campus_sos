@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1047056194013",
+    "project_id": "campus-sos-68cf5",
+    "storage_bucket": "campus-sos-68cf5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1047056194013:android:3edad4ecc46ea73791be34",
+        "android_client_info": {
+          "package_name": "com.example.campus_sos"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDrZ_Q9iTBesSzo4RhO5VPJxjFDi3ox5ww"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

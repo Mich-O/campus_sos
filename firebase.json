@@ -1,1 +1,1 @@
-{ }
+{"flutter":{"platforms":{"android":{"default":{"projectId":"campus-sos-68cf5","appId":"1:1047056194013:android:3edad4ecc46ea73791be34","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"campus-sos-68cf5","configurations":{"android":"1:1047056194013:android:3edad4ecc46ea73791be34","ios":"1:1047056194013:ios:3fe3854210736b9491be34","macos":"1:1047056194013:ios:3fe3854210736b9491be34","web":"1:1047056194013:web:e6ff6e8556d1771591be34","windows":"1:1047056194013:web:a58fd0fa0ef531d191be34"}}}}}}

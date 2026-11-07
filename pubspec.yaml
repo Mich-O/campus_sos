@@ -37,6 +37,10 @@ dependencies:
   provider: ^6.1.2
   image_picker: ^1.1.2
   path_provider: ^2.1.6
+  firebase_core: ^5.1.0
+  firebase_auth: ^7.0.1
+  cloud_firestore: ^7.1.0
+  firebase_storage: ^14.0.1
 
 dev_dependencies:
   flutter_test:
@@ -89,3 +93,8 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+# Keep Android builds on the plugin-backed Foundation release; 2.6.0 adds an FFI hook that breaks on this Windows path with spaces.
+dependency_overrides:
+  path_provider_foundation: 2.5.1
+
