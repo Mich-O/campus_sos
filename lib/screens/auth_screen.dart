@@ -30,10 +30,24 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     'invalid-email' => e.message ?? 'Use your ALU student email or the approved staff account.',
     'user-not-found' || 'wrong-password' || 'invalid-credential' => 'Email or password is incorrect.',
     'email-already-in-use' => 'An account already exists for this email.',
-    'weak-password' => 'Choose a password with at least 6 characters.',
+    'weak-password' => 'Use 12 or more characters with uppercase, lowercase, a number, and a symbol.',
     'network-request-failed' => 'Could not connect. Check your internet connection.',
     _ => e.message ?? 'Sign-in failed. Please try again.',
   };
+  String? _validatePassword(String? value) {
+    if (value == null || value.isEmpty) return 'Enter a password.';
+    // Existing accounts may keep signing in with their current password.
+    if (!_registering) return null;
+    if (value.length < 12) return 'Use at least 12 characters.';
+    if (!RegExp(r'[a-z]').hasMatch(value)) return 'Add a lowercase letter.';
+    if (!RegExp(r'[A-Z]').hasMatch(value)) return 'Add an uppercase letter.';
+    if (!RegExp(r'[0-9]').hasMatch(value)) return 'Add a number.';
+    const allowedSymbols = r'''^$*.[\]{}()?"!@#%&/\,><':;|_~''';
+    if (!value.split('').any((character) => allowedSymbols.contains(character))) {
+      return 'Add a symbol such as !, @, #, or _.';
+    }
+    return null;
+  }
   @override Widget build(BuildContext context) => Scaffold(
     backgroundColor: AppColors.ink,
     body: SafeArea(child: Stack(children: [
@@ -69,7 +83,11 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                 onFieldSubmitted: (_) => _submit(),
                 decoration: InputDecoration(suffixIcon: IconButton(tooltip: _obscure ? 'Show password' : 'Hide password',
                   onPressed: () => setState(() => _obscure = !_obscure), icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined))),
-                validator: (v) => (v == null || v.length < 6) ? 'Use at least 6 characters.' : null),
+                validator: _validatePassword),
+              if (_registering) ...[
+                const SizedBox(height: 6),
+                Text('12+ characters, with uppercase, lowercase, a number, and a symbol.', style: AppText.secondary),
+              ],
               if (_error != null) ...[const SizedBox(height: 12), Text(_error!, style: AppText.secondary.copyWith(color: AppColors.error))],
               const SizedBox(height: 20),
               SizedBox(height: 56, child: FilledButton(
