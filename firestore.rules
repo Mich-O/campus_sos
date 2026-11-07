@@ -1,1 +1,95 @@
-// Backend security rules are deferred until the Firebase stage.
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function verified() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+    function studentEmail() {
+      return request.auth.token.email.matches('^[^@]+@alustudent\\.com$');
+    }
+    function approvedStaffEmail() {
+      return request.auth.token.email.matches('^[^@]+@alueducation\\.com$')
+        || request.auth.token.email == 'michaelokinyi19@gmail.com';
+    }
+    function aluStudent() { return verified() && studentEmail(); }
+    function staff() {
+      return verified() && approvedStaffEmail()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'staff';
+    }
+    function permitted() { return aluStudent() || staff(); }
+
+    match /users/{uid} {
+      allow create: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.keys().hasOnly(['displayName','email','role','program','location','photoUrl','createdAt'])
+        && ((request.resource.data.role == 'student' && studentEmail())
+          || (request.resource.data.role == 'staff' && request.auth.token.email == 'michaelokinyi19@gmail.com'));
+      allow read: if (request.auth.uid == uid && verified()
+          && (permitted() || request.auth.token.email == 'michaelokinyi19@gmail.com'))
+        || (permitted() && staff());
+      allow update: if request.auth.uid == uid && verified()
+        && (permitted() || request.auth.token.email == 'michaelokinyi19@gmail.com')
+        && request.resource.data.email == resource.data.email
+        && ((request.resource.data.role == resource.data.role
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName','program','location','photoUrl']))
+          || (request.auth.token.email == 'michaelokinyi19@gmail.com'
+              && resource.data.role == 'student' && request.resource.data.role == 'staff'
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role'])));
+      allow delete: if false;
+
+      match /notifications/{notificationId} {
+        allow read: if permitted() && request.auth.uid == uid;
+        allow create: if staff()
+          && request.resource.data.keys().hasOnly(['reportId','reportTitle','shortId','status','note','readAt','createdAt'])
+          && request.resource.data.reportId is string
+          && request.resource.data.status in ['submitted','acknowledged','inProgress','resolved']
+          && request.resource.data.note is string;
+        allow update: if aluStudent() && request.auth.uid == uid
+          && resource.data.readAt == null
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readAt'])
+          && request.resource.data.readAt is timestamp;
+        allow delete: if false;
+      }
+    }
+
+    match /reports/{id} {
+      allow read: if permitted();
+      allow create: if aluStudent() && request.resource.data.authorId == request.auth.uid
+        && request.resource.data.status == 'submitted'
+        && request.resource.data.title is string
+        && request.resource.data.description is string
+        && request.resource.data.category is string
+        && request.resource.data.location is string
+        && request.resource.data.hideName is bool
+        && request.resource.data.upvoteCount == 0;
+      allow update: if (staff()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','updatedAt'])
+          && request.resource.data.status in ['submitted','acknowledged','inProgress','resolved'])
+        || (aluStudent()
+          && resource.data.authorId == request.auth.uid
+          && resource.data.status == 'submitted'
+          && request.resource.data.status == resource.data.status
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title','description','category','location','hideName','updatedAt']));
+      allow delete: if staff()
+        || (aluStudent() && resource.data.authorId == request.auth.uid && resource.data.status == 'submitted');
+
+      match /updates/{updateId} {
+        allow read: if permitted();
+        allow create: if (staff()
+            && request.resource.data.byUid == request.auth.uid
+            && request.resource.data.status in ['submitted','acknowledged','inProgress','resolved']
+            && request.resource.data.note is string)
+          || (aluStudent()
+            && request.resource.data.byUid == request.auth.uid
+            && request.resource.data.status == 'submitted');
+        allow update, delete: if false;
+      }
+      match /upvotes/{uid} {
+        allow read: if permitted();
+        allow create, delete: if aluStudent() && uid == request.auth.uid;
+        allow update: if false;
+      }
+    }
+  }
+}
