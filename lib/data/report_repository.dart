@@ -1,130 +1,112 @@
-import 'dart:convert';
 import 'dart:io';
-
-import 'package:path_provider/path_provider.dart';
-
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../models/campus_notification.dart';
 import '../models/incident_report.dart';
+import 'cloudinary_media_repository.dart';
 
 class ReportRepository {
-  final List<IncidentReport> _reports = [
-    IncidentReport(
-      id: 'sample-1',
-      title: 'Water supply interruption',
-      description: 'The taps on the second floor have had no running water since this morning.',
-      category: 'Water',
-      location: 'Student Residence · Block B',
-      status: IncidentStatus.inProgress,
-      reporterName: 'A. Student',
-      createdAt: DateTime.now().subtract(const Duration(hours: 3)),
-    ),
-    IncidentReport(
-      id: 'sample-2',
-      title: 'Projector not working',
-      description: 'The classroom projector does not turn on.',
-      category: 'Facilities',
-      location: 'Learning Centre · Room 204',
-      status: IncidentStatus.submitted,
-      reporterName: 'M. Student',
-      createdAt: DateTime.now().subtract(const Duration(hours: 7)),
-    ),
-    IncidentReport(
-      id: 'sample-3',
-      title: 'Overflowing recycling bin',
-      description: 'Please arrange a collection near the cafeteria entrance.',
-      category: 'Sanitation',
-      location: 'Main Cafeteria',
-      status: IncidentStatus.resolved,
-      reporterName: 'N. Student',
-      createdAt: DateTime.now().subtract(const Duration(days: 1)),
-    ),
-  ];
+  ReportRepository({FirebaseFirestore? firestore, required CloudinaryMediaRepository media})
+      : _db = firestore ?? FirebaseFirestore.instance, _media = media;
+  final FirebaseFirestore _db;
+  final CloudinaryMediaRepository _media;
 
-  Directory? _appDirectory;
-  List<IncidentReport> get reports => List.unmodifiable(_reports);
-
-  Future<List<IncidentReport>> load() async {
-    final file = await _reportsFile();
-    if (!await file.exists()) {
-      await _save();
-      return reports;
-    }
-    final decoded = jsonDecode(await file.readAsString()) as List<dynamic>;
-    _reports
-      ..clear()
-      ..addAll(
-        decoded.map(
-          (entry) =>
-              IncidentReport.fromJson(Map<String, dynamic>.from(entry as Map)),
-        ),
-      );
-    return reports;
-  }
-
-  Future<void> add(IncidentReport report) async {
-    var savedReport = report;
-    final sourcePath = report.photoPath;
-    if (sourcePath != null) {
-      final source = File(sourcePath);
-      if (!await source.exists()) {
-        throw FileSystemException(
-          'The selected photo could not be found.',
-          sourcePath,
-        );
+  Stream<List<IncidentReport>> watchReports() async* {
+    final query = _db.collection('reports').orderBy('createdAt', descending: true);
+    var transientRetries = 0;
+    while (true) {
+      try {
+        await for (final snapshot in query.snapshots()) {
+          yield snapshot.docs.map(IncidentReport.fromFirestore).toList();
+        }
+        return;
+      } on FirebaseException catch (error) {
+        const retryableCodes = {'unavailable', 'deadline-exceeded', 'unknown'};
+        if (!retryableCodes.contains(error.code) || transientRetries >= 2) rethrow;
+        await Future<void>.delayed(Duration(milliseconds: 500 * (transientRetries + 1)));
+        transientRetries++;
       }
-      final appDirectory = await _directory();
-      final photosDirectory = Directory('${appDirectory.path}/report_photos');
-      await photosDirectory.create(recursive: true);
-      final extension = sourcePath.contains('.')
-          ? '.${sourcePath.split('.').last}'
-          : '.jpg';
-      final destination = '${photosDirectory.path}/${report.id}$extension';
-      final copiedPhoto = await source.copy(destination);
-      savedReport = IncidentReport(
-        id: report.id,
-        title: report.title,
-        description: report.description,
-        category: report.category,
-        location: report.location,
-        status: report.status,
-        reporterName: report.reporterName,
-        createdAt: report.createdAt,
-        photoPath: copiedPhoto.path,
-      );
     }
-    _reports.insert(0, savedReport);
-    await _save();
   }
 
-  Future<void> updateStatus(String id, IncidentStatus status) async {
-    final index = _reports.indexWhere((report) => report.id == id);
-    if (index < 0) return;
-    final old = _reports[index];
-    _reports[index] = IncidentReport(
-      id: old.id,
-      title: old.title,
-      description: old.description,
-      category: old.category,
-      location: old.location,
-      status: status,
-      reporterName: old.reporterName,
-      createdAt: old.createdAt,
-      photoPath: old.photoPath,
-    );
-    await _save();
+  Stream<List<StatusUpdate>> watchUpdates(String id) => _db.collection('reports').doc(id)
+      .collection('updates').orderBy('at').snapshots()
+      .map((s) => s.docs.map((d) => StatusUpdate.fromMap(d.data())).toList());
+
+  Stream<List<CampusNotification>> watchNotifications(String uid) => _db.collection('users').doc(uid)
+      .collection('notifications').orderBy('createdAt', descending: true).limit(50)
+      .snapshots().map((s) => s.docs.map(CampusNotification.fromFirestore).toList());
+
+  Future<void> markNotificationRead(String uid, String notificationId) =>
+      _db.collection('users').doc(uid).collection('notifications').doc(notificationId)
+          .update({'readAt': FieldValue.serverTimestamp()});
+
+  Future<IncidentReport?> getReport(String id) async {
+    final doc = await _db.collection('reports').doc(id).get();
+    return doc.exists ? IncidentReport.fromFirestore(doc) : null;
   }
 
-  Future<Directory> _directory() async =>
-      _appDirectory ??= await getApplicationDocumentsDirectory();
-
-  Future<File> _reportsFile() async {
-    final directory = await _directory();
-    return File('${directory.path}/campus_sos_reports.json');
+  Future<void> createReport({
+    required User user,
+    required String name,
+    required String title,
+    required String description,
+    required String category,
+    required String location,
+    required bool hideName,
+    String? photoPath,
+  }) async {
+    final doc = _db.collection('reports').doc();
+    var photoUrls = <String>[];
+    if (photoPath != null) {
+      final uploaded = await _media.uploadImage(filePath: photoPath, folder: 'campus-sos/reports/' + user.uid);
+      photoUrls = [uploaded.url];
+    }
+    final batch = _db.batch();
+    batch.set(doc, {
+      'shortId': 'CSOS-' + doc.id.substring(0, 6).toUpperCase(),
+      'title': title.trim(), 'description': description.trim(), 'category': category,
+      'location': location, 'photoUrls': photoUrls, 'status': 'submitted',
+      'authorId': user.uid, 'displayAuthor': hideName ? null : (name.isEmpty ? 'Student' : name),
+      'hideName': hideName, 'upvoteCount': 0,
+      'createdAt': FieldValue.serverTimestamp(), 'updatedAt': FieldValue.serverTimestamp(),
+    });
+    batch.set(doc.collection('updates').doc(), {
+      'status': 'submitted', 'note': 'Report submitted', 'byUid': user.uid,
+      'byName': name.isEmpty ? 'Student' : name, 'at': FieldValue.serverTimestamp(),
+    });
+    await batch.commit();
   }
 
-  Future<void> _save() async {
-    final file = await _reportsFile();
-    await file.writeAsString(
-      jsonEncode(_reports.map((report) => report.toJson()).toList()),
-    );
+  Future<void> updateStatus({
+    required IncidentReport report,
+    required IncidentStatus status,
+    required String note,
+    required User staff,
+    required String staffName,
+  }) async {
+    final reportRef = _db.collection('reports').doc(report.id);
+    final batch = _db.batch();
+    batch.update(reportRef, {'status': status.value, 'updatedAt': FieldValue.serverTimestamp()});
+    batch.set(reportRef.collection('updates').doc(), {
+      'status': status.value, 'note': note.trim(), 'byUid': staff.uid,
+      'byName': staffName, 'at': FieldValue.serverTimestamp(),
+    });
+    final notificationRef = _db.collection('users').doc(report.authorId).collection('notifications').doc();
+    batch.set(notificationRef, {
+      'reportId': report.id, 'reportTitle': report.title, 'shortId': report.shortId,
+      'status': status.value, 'note': note.trim(), 'readAt': null,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    await batch.commit();
   }
+
+  Future<String> uploadProfilePhoto({required User user, required String filePath}) async {
+    final uploaded = await _media.uploadImage(filePath: filePath, folder: 'campus-sos/profiles/' + user.uid);
+    await _db.collection('users').doc(user.uid).update({'photoUrl': uploaded.url});
+    await user.updatePhotoURL(uploaded.url);
+    return uploaded.url;
+  }
+
+  Future<void> deleteReport(String id) => _db.collection('reports').doc(id).delete();
 }
