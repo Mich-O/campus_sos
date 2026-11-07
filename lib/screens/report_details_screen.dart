@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -111,6 +113,18 @@ class ReportDetailsScreen extends StatelessWidget {
               ],
             ),
           ),
+          if (report.photoPath != null) ...[
+            const SizedBox(height: 14),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(18),
+              child: Image.file(
+                File(report.photoPath!),
+                fit: BoxFit.cover,
+                height: 210,
+                errorBuilder: (_, _, _) => const SizedBox.shrink(),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -211,3 +225,4 @@ class _StatusTimeline extends StatelessWidget {
     );
   }
 }
+

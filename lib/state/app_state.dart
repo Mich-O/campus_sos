@@ -15,6 +15,7 @@ class AppState extends ChangeNotifier {
     required String description,
     required String category,
     required String location,
+    String? photoPath,
   }) {
     _repository.add(
       IncidentReport(
@@ -26,6 +27,7 @@ class AppState extends ChangeNotifier {
         status: IncidentStatus.submitted,
         reporterName: 'You',
         createdAt: DateTime.now(),
+        photoPath: photoPath,
       ),
     );
     notifyListeners();
@@ -36,3 +38,4 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 }
+

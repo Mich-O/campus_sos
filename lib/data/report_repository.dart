@@ -51,6 +51,8 @@ class ReportRepository {
       status: status,
       reporterName: old.reporterName,
       createdAt: old.createdAt,
+      photoPath: old.photoPath,
     );
   }
 }
+

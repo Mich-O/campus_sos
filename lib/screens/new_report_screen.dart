@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../models/incident_report.dart';
@@ -16,6 +19,7 @@ class _NewReportScreenState extends State<NewReportScreen> {
   final _description = TextEditingController();
   final _location = TextEditingController();
   String _category = incidentCategories.first;
+  XFile? _photo;
 
   @override
   void dispose() {
@@ -98,17 +102,48 @@ class _NewReportScreenState extends State<NewReportScreen> {
                 : null,
           ),
           const SizedBox(height: 18),
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(15),
-            ),
-            child: const Text(
-              'Photo attachments will be added in a later step.',
-              style: TextStyle(color: Color(0xFF727C94)),
+          const _Label('Photo (optional)'),
+          InkWell(
+            onTap: _choosePhoto,
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              height: 145,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border.all(color: const Color(0xFFDDE1EB)),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: _photo == null
+                  ? const Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.add_photo_alternate_outlined,
+                          color: Color(0xFF6546E8),
+                          size: 28,
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          'Tap to choose a photo',
+                          style: TextStyle(color: Color(0xFF727C94)),
+                        ),
+                      ],
+                    )
+                  : ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: Image.file(File(_photo!.path), fit: BoxFit.cover),
+                    ),
             ),
           ),
+          if (_photo != null)
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: () => setState(() => _photo = null),
+                icon: const Icon(Icons.close),
+                label: const Text('Remove photo'),
+              ),
+            ),
           const SizedBox(height: 18),
           FilledButton.icon(
             onPressed: _submit,
@@ -125,6 +160,32 @@ class _NewReportScreenState extends State<NewReportScreen> {
     ),
   );
 
+  Future<void> _choosePhoto() async {
+    try {
+      final photo = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 78,
+        maxWidth: 1600,
+      );
+      if (photo == null || !mounted) return;
+      if (await photo.length() > 5 * 1024 * 1024) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Choose a photo smaller than 5 MB.')),
+          );
+        }
+        return;
+      }
+      setState(() => _photo = photo);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open the photo picker.')),
+        );
+      }
+    }
+  }
+
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
     context.read<AppState>().createReport(
@@ -132,6 +193,7 @@ class _NewReportScreenState extends State<NewReportScreen> {
       description: _description.text,
       category: _category,
       location: _location.text,
+      photoPath: _photo?.path,
     );
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(
@@ -149,3 +211,4 @@ class _Label extends StatelessWidget {
     child: Text(text, style: const TextStyle(fontWeight: FontWeight.w800)),
   );
 }
+

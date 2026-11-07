@@ -10,6 +10,7 @@ class IncidentReport {
     required this.status,
     required this.reporterName,
     required this.createdAt,
+    this.photoPath,
   });
 
   final String id;
@@ -20,6 +21,7 @@ class IncidentReport {
   final IncidentStatus status;
   final String reporterName;
   final DateTime createdAt;
+  final String? photoPath;
 }
 
 const incidentCategories = [
@@ -37,3 +39,5 @@ String statusLabel(IncidentStatus status) => switch (status) {
   IncidentStatus.inProgress => 'In progress',
   IncidentStatus.resolved => 'Resolved',
 };
+
+

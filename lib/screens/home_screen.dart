@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -414,7 +415,16 @@ class ReportCard extends StatelessWidget {
                   color: const Color(0xFFF0EDFF),
                   borderRadius: BorderRadius.circular(15),
                 ),
-                child: Icon(icon, color: _violet),
+                child: report.photoPath == null
+                    ? Icon(icon, color: _violet)
+                    : ClipRRect(
+                        borderRadius: BorderRadius.circular(15),
+                        child: Image.file(
+                          File(report.photoPath!),
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => Icon(icon, color: _violet),
+                        ),
+                      ),
               ),
               const SizedBox(width: 13),
               Expanded(
@@ -471,3 +481,4 @@ class ReportCard extends StatelessWidget {
     );
   }
 }
+
