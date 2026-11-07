@@ -1,30 +1,39 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:campus_sos/main.dart';
+import 'package:campus_sos/data/auth_service.dart';
+import 'package:campus_sos/models/incident_report.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  group('PasswordPolicy', () {
+    test('accepts a password that meets the full policy', () {
+      expect(PasswordPolicy.validate('CampusSOS2026!'), isNull);
+    });
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    test('requires at least twelve characters', () {
+      expect(PasswordPolicy.validate('Campus1!'), 'Use at least 12 characters.');
+    });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    test('requires lowercase, uppercase, a number, and a symbol', () {
+      expect(PasswordPolicy.validate('CAMPUSSOS2026!'), 'Add a lowercase letter.');
+      expect(PasswordPolicy.validate('campussos2026!'), 'Add an uppercase letter.');
+      expect(PasswordPolicy.validate('CampusSosStrong!'), 'Add a number.');
+      expect(PasswordPolicy.validate('CampusSos2026A'), 'Add a symbol such as !, @, #, or _.');
+    });
+  });
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+  group('incident values', () {
+    test('maps Firestore status values to the matching status', () {
+      expect(IncidentStatusView.fromValue('acknowledged'), IncidentStatus.acknowledged);
+      expect(IncidentStatusView.fromValue('inProgress'), IncidentStatus.inProgress);
+      expect(IncidentStatusView.fromValue('resolved'), IncidentStatus.resolved);
+    });
+
+    test('falls back safely for an unknown category', () {
+      expect(ReportCategory.fromValue('unknown'), ReportCategory.other);
+    });
+  });
+
+  test('status exposes the student-facing label', () {
+    expect(IncidentStatus.submitted.label, 'Submitted');
+    expect(IncidentStatus.inProgress.label, 'In progress');
   });
 }
