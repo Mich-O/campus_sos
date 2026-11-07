@@ -1,22 +1,18 @@
 # Campus SOS
 
-Campus SOS is a Flutter mobile app for reporting and tracking campus incidents at ALU Kigali. Students can report issues such as damaged facilities, water or electricity outages, sanitation problems, and safety concerns. Authorized staff can review reports and post status updates for students.
+Campus SOS is a Flutter app for reporting campus issues at ALU Kigali and following them through to resolution. Students can describe a problem, identify where it occurred, and attach a photo. Campus staff can review reports, record progress, and leave updates for students.
 
-## Main workflows
+## Using the app
 
-- Create an account or sign in with an ALU email; new accounts must verify their email.
-- Submit a report with a category, description, campus location, and optional photo.
-- Browse reports, search by text, and filter by owner, status, or category.
-- Open a report to view its status history, staff notes, and attached photo.
-- Receive notifications when staff update a report.
-- Edit profile details or change the profile photo.
-- Use the staff console to acknowledge, progress, or resolve reports.
+After creating an account and verifying an ALU email address, a student can submit a report under categories such as facilities, water, electricity, sanitation, furniture, or safety. Reports can be searched and filtered, and each report has a detail view with its current status, history, and staff updates. Students can also manage their profile and receive notifications when a report changes.
 
-## Architecture
+Staff accounts have access to report review tools. Staff can acknowledge a report, mark work as in progress, resolve it, and add a note for the student. The app checks the signed-in user's role before showing staff actions, while Firestore Security Rules enforce who may change report status.
 
-The app uses Riverpod for application state. The screen layer is in `lib/screens/`, reusable UI in `lib/widgets/`, domain models in `lib/models/`, and Firebase/media access in `lib/data/`. `lib/state/providers.dart` wires the repositories and streams to the screens. Firebase Authentication handles accounts and sessions; Cloud Firestore stores profiles, reports, status history, and notifications.
+## Project structure
 
-### Firestore structure
+Campus SOS uses Riverpod to connect the interface to application state and data services. Screens are in `lib/screens/`, shared interface components are in `lib/widgets/`, data models are in `lib/models/`, and authentication, Firestore, and media services are in `lib/data/`. Providers in `lib/state/providers.dart` make those services available to the screens.
+
+Firebase Authentication manages accounts and sessions. Cloud Firestore stores user profiles, reports, report updates, and notifications. The main document layout is:
 
 ```text
 users/{uid}
@@ -25,49 +21,47 @@ reports/{reportId}
   updates/{updateId}
 ```
 
-Reports store their author UID, category, description, location, status, timestamps, and optional Cloudinary photo URL. Status changes create an immutable update-history record and a notification for the reporting student.
+Each report records its category, description, location, author, status, timestamps, and optional photo URL. Status changes are recorded as report updates so the progression remains visible over time.
 
-## Roles and access control
+## Accounts and permissions
 
-- Verified `@alustudent.com` accounts can submit reports and read campus reports.
-- Authorized staff use verified `@alueducation.com` accounts provisioned with the staff role. The explicitly configured test staff account is also supported.
-- Firestore Security Rules enforce role and email checks. Students cannot change a report's status by calling Firestore directly; staff status updates and update-history writes are checked by the rules.
+New accounts must verify their email address. Student accounts use the `@alustudent.com` domain. Staff accounts use `@alueducation.com` and must have the staff role in their user profile. A designated test account is configured for staff workflow testing.
 
-The Firebase rules are in `firestore.rules`. Deploy them with:
+The rules in `firestore.rules` are the access-control boundary for Firestore data. They restrict status changes and staff update creation to authorized staff, including when a request is made outside the app interface. Deploy the rules from the project directory with:
 
 ```powershell
 firebase deploy --only firestore:rules --project campus-sos-68cf5
 ```
 
-## Photo uploads
+## Photos
 
-The instructor approved Cloudinary as the image service for this assignment. Firebase Authentication and Firestore remain in use; report and profile photos upload to Cloudinary, and their URLs are stored in Firestore. The app uses an unsigned image preset configured in `lib/data/cloudinary_config.dart`. Cloud name and preset name are public identifiers; never add a Cloudinary API secret to the Flutter app or repository.
+Profile and report photos are uploaded to Cloudinary. The app stores the resulting delivery URL in the corresponding Firestore document. The Cloudinary cloud name and unsigned upload preset are configured in `lib/data/cloudinary_config.dart`; these are public identifiers. An API secret must not be placed in the Flutter app.
 
-The preset should restrict allowed formats to JPG, JPEG, PNG, and WebP. The app also checks for a maximum 5 MB file, although unsigned presets do not enforce that size limit on their own. Uploaded photos have public delivery URLs, so users should avoid attaching sensitive images.
+The app accepts JPG, JPEG, PNG, and WebP images up to 5 MB. Cloudinary delivery URLs are public, so photos should not contain private or sensitive information.
 
-## Run on an Android device
+## Run on Android
 
-1. Install Flutter and Android Studio, and connect an Android device with USB debugging enabled.
-2. From the project folder, run `flutter pub get`.
-3. Deploy Firestore rules if they have changed using the command above.
-4. Run the app with the provided PowerShell helper:
+Install Flutter and Android Studio, connect an Android device with USB debugging enabled, then run these commands from the project directory:
 
 ```powershell
+flutter pub get
 .\run_on_device.ps1
 ```
 
-The helper defaults to device `CPH2471`. To use another device ID, run `.\run_on_device.ps1 -DeviceId YOUR_DEVICE_ID` from PowerShell.
+The PowerShell helper uses the configured Android device ID `CPH2471` by default. To select another connected device, pass its ID:
 
-## Testing strategy
+```powershell
+.\run_on_device.ps1 -DeviceId YOUR_DEVICE_ID
+```
 
-The test file covers the password policy, Firestore status/category value mapping, and the labels shown for report statuses. Run the automated checks with:
+Firebase platform configuration is in `lib/firebase_options.dart`. The app also requires the Firebase Authentication email/password provider and deployed Firestore rules. Photo uploads require the cloud name and preset in `lib/data/cloudinary_config.dart` to match the Cloudinary account configuration.
+
+## Verification
+
+Run the automated checks from the project directory with:
 
 ```powershell
 flutter test
 ```
 
-Manual end-to-end checks should cover registration and email verification, sign-in/out, report submission with and without a photo, search and filters, report details, staff status changes and notes, student notifications, profile save/cancel/photo changes, and rules rejecting a student's direct attempt to change report status. The app should be exercised on an Android device because browser-only execution does not meet the assignment requirement.
-
-## Assignment deliverables
-
-The final submission also requires a technical report in PDF format using APA or IEEE citations, a 7–10 minute demonstration video, and the GitHub repository link. The report should explain the architecture, Firestore model, role/security design, state management, UI decisions, tests, challenges, and lessons learned, with diagrams and workflow screenshots.
+The current tests cover password-policy validation, report category and status mappings, and status labels. On a device, the main flows to check are account verification and sign-in, report submission with and without a photo, search and filtering, report details, profile changes, staff updates, and the resulting student notifications.
